@@ -1,0 +1,32 @@
+#Get pt-query-digest:
+wget http://www.percona.com/get/pt-query-digest
+
+#create a user
+mysql -uroot -e 'grant all on percona.* to noinject@"%" identified by "injectno"'
+
+#Create the whitelist table:
+mysqladmin -uroot create percona
+
+#you will need a slow query log, any queries processed in the log will be added
+#to the whitelist table.  You will have to mark them as OK in the GUI
+pt-query-digest --sample=1 --create-review-table --review "u=noinject,p=injectno,h=127.0.0.1,P=3306,D=percona,t=whitelist" /path/to/logs/slow.log
+
+#install the whitelist_exception table (the log of whitelist violations)
+mysql -uroot percona < whitelist_exception.sql
+
+#copy the noinject.lua to /usr/local/mysql-proxy
+cp noinject.lua /usr/local/mysql-proxy
+
+#EDIT THE script and make any desired configuration changes
+vi /usr/local/mysql-proxy/noinject.lua
+
+#start the mysql-proxy using the Lua script (noinject.lua)
+/usr/local/mysql-proxy/bin/mysql-proxy --proxy-lua-script=/usr/local/mysql-proxy/noinject.lua
+
+sudo mkdir /var/www/html/noinject
+sudo cp index.php /var/www/html/noinject
+sudo chmod -R a+r /var/www/html/noinject
+sudo chmod  a+x /var/www/html/noinject
+
+#NOTE:
+#Be sure to use a .htaccess file to prevent unauthorized access to the web interface!
